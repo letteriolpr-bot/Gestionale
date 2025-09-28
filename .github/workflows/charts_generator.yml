@@ -1,0 +1,32 @@
+name: Generate SO5 Charts
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Esegui una volta al giorno alle 03:00 UTC
+    - cron: '0 3 * * *'
+
+jobs:
+  run-chart-generator:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Installa dipendenze
+        run: pip install -r requirements.txt
+
+      - name: "Esegui Creazione Grafici SO5"
+        env:
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+          USER_SLUG: ${{ secrets.USER_SLUG }}
+          GSPREAD_CREDENTIALS: ${{ secrets.GSPREAD_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python gestionale.py create_charts
