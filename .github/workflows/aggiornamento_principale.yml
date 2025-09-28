@@ -1,0 +1,77 @@
+name: Aggiornamento Dati Principale
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Esegui ogni 15 minuti
+    - cron: '*/20 * * * *'
+
+permissions:
+  contents: write
+
+jobs:
+  run-full-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codice
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Installa dipendenze
+        run: pip install requests gspread google-auth-oauthlib
+
+      - name: "PASSO 1: Sincronizza Galleria (Aggiungi/Rimuovi carte)"
+        env:
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+          USER_SLUG: ${{ secrets.USER_SLUG }}
+          GSPREAD_CREDENTIALS: ${{ secrets.GSPREAD_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python gestionale.py sync_galleria
+
+      - name: "PASSO 2: Aggiorna Dati Carte (Stats, Prezzi, etc.)"
+        env:
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+          USER_SLUG: ${{ secrets.USER_SLUG }}
+          GSPREAD_CREDENTIALS: ${{ secrets.GSPREAD_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python gestionale.py update_cards
+
+      - name: "PASSO 3: Aggiorna Cronologia Vendite"
+        env:
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+          USER_SLUG: ${{ secrets.USER_SLUG }}
+          GSPREAD_CREDENTIALS: ${{ secrets.GSPREAD_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python gestionale.py update_sales
+
+      - name: "PASSO 4: Verifica Formazioni Schierate"
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SORARE_API_KEY: ${{ secrets.SORARE_API_KEY }}
+          GSPREAD_CREDENTIALS: ${{ secrets.GSPREAD_CREDENTIALS }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+          USER_SLUG: ${{ secrets.USER_SLUG }}
+        run: python check_lineups.py
+
+      - name: Salva lo stato (se modificato)
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          # Controlla se ci sono modifiche da committare
+          if ! git diff --quiet state.json; then
+            git add state.json
+            git commit -m "Aggiorna stato dopo esecuzione principale"
+            git push
+          else
+            echo "Nessuna modifica allo stato da salvare."
+          fi
